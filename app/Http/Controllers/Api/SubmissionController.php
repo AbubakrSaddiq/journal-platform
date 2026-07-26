@@ -8,8 +8,10 @@ use App\Http\Requests\StoreSubmissionRequest;
 use App\Http\Requests\UpdateSubmissionRequest;
 use App\Http\Resources\SubmissionResource;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Routing\Controller as BaseController;
 
-class SubmissionController
+class SubmissionController extends BaseController
 {
     protected SubmissionService $submissionService;
 
@@ -48,6 +50,8 @@ class SubmissionController
      */
     public function show(Submission $submission)
     {
+        Gate::authorize('view', $submission);
+
         return new SubmissionResource(
             $submission->load(['author', 'journal', 'section', 'versions', 'reviews', 'editorialDecisions'])
         );
@@ -103,7 +107,7 @@ class SubmissionController
      */
     public function update(UpdateSubmissionRequest $request, Submission $submission)
     {
-        $this->authorize('update', $submission);
+        Gate::authorize('update', $submission);
 
         // Only allow updates before review starts
         if (!in_array($submission->status, ['submitted', 'editorial_review'])) {
@@ -122,7 +126,7 @@ class SubmissionController
      */
     public function sendToReview(Submission $submission)
     {
-        $this->authorize('sendToReview', $submission);
+        Gate::authorize('sendToReview', $submission);
 
         $this->submissionService->sendToReview($submission, auth()->id());
 
@@ -134,7 +138,7 @@ class SubmissionController
      */
     public function requestRevision(Submission $submission)
     {
-        $this->authorize('requestRevision', $submission);
+        Gate::authorize('requestRevision', $submission);
 
         $revisionType = request()->input('revision_type', 'minor'); // minor or major
 
@@ -148,7 +152,7 @@ class SubmissionController
      */
     public function accept(Submission $submission)
     {
-        $this->authorize('accept', $submission);
+        Gate::authorize('accept', $submission);
 
         $this->submissionService->accept($submission, auth()->id());
 
@@ -160,7 +164,7 @@ class SubmissionController
      */
     public function reject(Submission $submission)
     {
-        $this->authorize('reject', $submission);
+        Gate::authorize('reject', $submission);
 
         $reason = request()->input('reason', 'Submission does not meet journal standards');
 

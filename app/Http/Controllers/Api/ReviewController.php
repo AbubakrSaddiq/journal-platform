@@ -6,8 +6,10 @@ use App\Models\ReviewInvitation;
 use App\Services\ReviewService;
 use App\Http\Resources\ReviewResource;
 use Illuminate\Http\Response;
+use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Support\Facades\Gate;
 
-class ReviewController
+class ReviewController extends BaseController
 {
     protected ReviewService $reviewService;
 
@@ -34,7 +36,7 @@ class ReviewController
      */
     public function show(ReviewInvitation $reviewInvitation)
     {
-        $this->authorize('view', $reviewInvitation);
+        Gate::authorize('view', $reviewInvitation);
 
         return new ReviewResource(
             $reviewInvitation->load(['submission', 'submission.journal'])
@@ -46,7 +48,7 @@ class ReviewController
      */
     public function acceptInvitation(ReviewInvitation $reviewInvitation)
     {
-        $this->authorize('view', $reviewInvitation);
+        Gate::authorize('view', $reviewInvitation);
 
         $this->reviewService->acceptInvitation($reviewInvitation, auth()->id());
 
@@ -58,7 +60,7 @@ class ReviewController
      */
     public function declineInvitation(ReviewInvitation $reviewInvitation)
     {
-        $this->authorize('view', $reviewInvitation);
+        Gate::authorize('view', $reviewInvitation);
 
         $this->reviewService->declineInvitation($reviewInvitation, auth()->id());
 
@@ -70,7 +72,7 @@ class ReviewController
      */
     public function submitReview(ReviewInvitation $reviewInvitation)
     {
-        $this->authorize('view', $reviewInvitation);
+        Gate::authorize('view', $reviewInvitation);
 
         $validated = request()->validate([
             'comments_for_editor' => 'required|string|min:10|max:5000',
