@@ -2,29 +2,51 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\SubmissionController;
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\FileController;
+
+// Health check
+Route::get('/health', fn() => response()->json(['status' => 'ok', 'version' => '1.0']));
 
 // Public routes
-Route::post('auth/register', [AuthController::class, 'register']);
-Route::post('auth/login', [AuthController::class, 'login']);
-Route::get('/health', function () {
-    return response()->json(['status' => 'ok']);
+Route::prefix('auth')->group(function () {
+    Route::post('register', [AuthController::class, 'register']);
+    Route::post('login', [AuthController::class, 'login']);
 });
+
+// Public journal browsing
+Route::get('journals', [JournalController::class, 'index']);
+Route::get('journals/{journal}', [JournalController::class, 'show']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('auth/logout', [AuthController::class, 'logout']);
-    Route::get('auth/me', [AuthController::class, 'me']);
 
+    // Auth
+    Route::prefix('auth')->group(function () {
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::get('me', [AuthController::class, 'me']);
+    });
+
+    // Submissions
     Route::apiResource('submissions', SubmissionController::class);
-    Route::post('submissions/{submission}/send-to-review', [SubmissionController::class, 'sendToReview']);
-    Route::post('submissions/{submission}/request-revision', [SubmissionController::class, 'requestRevision']);
-    Route::post('submissions/{submission}/accept', [SubmissionController::class, 'accept']);
-    Route::post('submissions/{submission}/reject', [SubmissionController::class, 'reject']);
+    Route::prefix('submissions/{submission}')->group(function () {
+        Route::post('send-to-review', [SubmissionController::class, 'sendToReview']);
+        Route::post('request-revision', [SubmissionController::class, 'requestRevision']);
+        Route::post('accept', [SubmissionController::class, 'accept']);
+        Route::post('reject', [SubmissionController::class, 'reject']);
+        Route::post('upload', [FileController::class, 'uploadManuscript']);
+        Route::get('versions', [FileController::class, 'versions']);
+        Route::get('files/{file}/download', [FileController::class, 'download']);
+    });
 
-    Route::apiResource('reviews', ReviewController::class)->only(['index', 'show', 'update']);
-    Route::post('reviews/{reviewInvitation}/accept', [ReviewController::class, 'acceptInvitation']);
-    Route::post('reviews/{reviewInvitation}/decline', [ReviewController::class, 'declineInvitation']);
-    Route::post('reviews/{reviewInvitation}/submit', [ReviewController::class, 'submitReview']);
+    // Reviews
+    Route::prefix('reviews')->group(function () {
+        Route::get('/', [ReviewController::class, 'index']);
+        Route::get('{reviewInvitation}', [ReviewController::class, 'show']);
+        Route::post('{reviewInvitation}/accept', [ReviewController::class, 'acceptInvitation']);
+        Route::post('{reviewInvitation}/decline', [ReviewController::class, 'declineInvitation']);
+        Route::post('{reviewInvitation}/submit', [ReviewController::class, 'submitReview']);
+    });
 });

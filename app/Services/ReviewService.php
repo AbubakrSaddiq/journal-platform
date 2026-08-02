@@ -7,6 +7,7 @@ use App\Models\ReviewInvitation;
 use App\Models\Review;
 use App\Models\User;
 use App\Models\AuditLog;
+use App\Notifications\ReviewerInvited;
 
 class ReviewService
 {
@@ -30,8 +31,10 @@ class ReviewService
             'reviewer_name' => $reviewer->name,
         ]);
 
-        // TODO: Send email notification to reviewer
-
+        // Send email notification to reviewer
+        // Notify reviewer
+        $reviewer->notify(new ReviewerInvited($invitation->load('submission.journal')));
+        
         return $invitation;
     }
 

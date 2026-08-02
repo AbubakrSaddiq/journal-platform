@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Models\Submission;
 use App\Models\AuditLog;
 use Illuminate\Database\Eloquent\Model;
+use App\Notifications\SubmissionReceived;
+use App\Notifications\RevisionRequested;
+use App\Notifications\EditorialDecisionMade;
 
 class SubmissionService
 {
@@ -89,6 +92,10 @@ class SubmissionService
     public function submit(Submission $submission, ?int $userId = null): void
     {
         $this->transitionTo($submission, 'submitted', $userId, 'Initial submission');
+
+        // Notify author
+
+        $submission->author->notify(new SubmissionReceived($submission->load('journal')));
     }
 
     /**
@@ -113,7 +120,13 @@ class SubmissionService
     public function requestRevision(Submission $submission, string $revisionType, ?int $userId = null): void
     {
         $this->transitionTo($submission, 'revision_required', $userId, "{$revisionType} revision requested");
-    }
+        
+        // Notify author
+        $submission->author->notify(new RevisionRequested(
+        $submission,
+        $revisionType,
+    ));
+        }
 
     /**
      * Accept submission.
@@ -121,7 +134,10 @@ class SubmissionService
     public function accept(Submission $submission, ?int $userId = null): void
     {
         $this->transitionTo($submission, 'accepted', $userId, 'Accepted for publication');
-    }
+
+        // notify author
+            $submission->author->notify(new EditorialDecisionMade($submission, 'accepted'));
+        }
 
     /**
      * Reject submission (terminal state).
@@ -129,6 +145,9 @@ class SubmissionService
     public function reject(Submission $submission, ?int $userId = null, ?string $reason = null): void
     {
         $this->transitionTo($submission, 'rejected', $userId, $reason ?? 'Submission rejected');
+        
+        // Notify author
+        $submission->author->notify(new EditorialDecisionMade($submission, 'rejected'));
     }
 
     /**
