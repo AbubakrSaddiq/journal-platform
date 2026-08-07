@@ -60,47 +60,23 @@ class SubmissionController extends BaseController
     /**
      * Store a new submission.
      */
+   
     public function store(StoreSubmissionRequest $request)
-    {
-        $submission = Submission::create([
-            'journal_id' => $request->journal_id,
-            'section_id' => $request->section_id,
-            'author_id' => auth()->id(),
-            'title' => $request->title,
-            'abstract' => $request->abstract,
-            'keywords' => $request->keywords,
-            'cover_letter' => $request->cover_letter,
-            'status' => 'submitted',
-            'submitted_at' => now(),
-        ]);
+{
+    $submission = Submission::create([
+        'journal_id' => $request->journal_id,
+        'section_id' => $request->section_id,
+        'author_id' => auth()->id(),
+        'title' => $request->title,
+        'abstract' => $request->abstract,
+        'keywords' => $request->keywords,
+        'cover_letter' => $request->cover_letter,
+        'status' => 'submitted',
+        'submitted_at' => now(),
+    ]);
 
-        // Create initial version
-        $version = $submission->versions()->create([
-            'version_number' => 1,
-            'uploaded_by_id' => auth()->id(),
-            'upload_notes' => 'Initial submission',
-            'uploaded_at' => now(),
-        ]);
-
-        $submission->update(['current_version_id' => $version->id]);
-
-        // Handle file uploads
-        if ($request->hasFile('manuscript')) {
-            $path = $request->file('manuscript')->store("submissions/{$submission->id}/v1", 'submissions');
-            $version->files()->create([
-                'file_path' => $path,
-                'original_filename' => $request->file('manuscript')->getClientOriginalName(),
-                'file_type' => $request->file('manuscript')->extension(),
-                'file_role' => 'manuscript',
-                'file_size' => $request->file('manuscript')->getSize(),
-            ]);
-        }
-
-        return response()->json(
-            new SubmissionResource($submission->load('currentVersion')),
-            Response::HTTP_CREATED
-        );
-    }
+    return new SubmissionResource($submission->load(['journal', 'section', 'author']));
+}
 
     /**
      * Update submission metadata (only before review).

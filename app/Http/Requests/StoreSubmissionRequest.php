@@ -20,7 +20,7 @@ class StoreSubmissionRequest extends FormRequest
             'abstract' => 'required|string|min:50|max:5000',
             'keywords' => 'nullable|string|max:500',
             'cover_letter' => 'nullable|string|max:2000',
-            'manuscript' => 'required|file|mimes:pdf,docx,doc|max:10240', // 10MB max
+            // 'manuscript' => 'required|file|mimes:pdf,docx,doc|max:10240', // 10MB max
         ];
     }
 
