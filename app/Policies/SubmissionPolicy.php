@@ -4,71 +4,52 @@ namespace App\Policies;
 
 use App\Models\User;
 use App\Models\Submission;
+use Illuminate\Support\Facades\DB;
 
 class SubmissionPolicy
 {
-    /**
-     * View submission.
-     */
     public function view(User $user, Submission $submission): bool
     {
-        // Author views own
         if ($user->id === $submission->author_id) {
             return true;
         }
-
-        // Editor views journal submissions
-        if ($user->roles()->where('journal_id', $submission->journal_id)->exists()) {
-            return true;
-        }
-
-        return false;
+        return $this->isEditor($user);
     }
 
-    /**
-     * Update submission (author only, before review).
-     */
     public function update(User $user, Submission $submission): bool
     {
         if ($user->id !== $submission->author_id) {
             return false;
         }
-
         return in_array($submission->status, ['submitted', 'editorial_review']);
     }
 
-    /**
-     * Send to review (editor only).
-     */
     public function sendToReview(User $user, Submission $submission): bool
     {
-        return $user->roles()
-            ->whereIn('slug', ['editor', 'managing_editor'])
-            ->where('journal_id', $submission->journal_id)
-            ->exists();
+        return $this->isEditor($user);
     }
 
-    /**
-     * Request revision (editor only).
-     */
     public function requestRevision(User $user, Submission $submission): bool
     {
-        return $this->sendToReview($user, $submission);
+        return $this->isEditor($user);
     }
 
-    /**
-     * Accept (editor only).
-     */
     public function accept(User $user, Submission $submission): bool
     {
-        return $this->sendToReview($user, $submission);
+        return $this->isEditor($user);
     }
 
-    /**
-     * Reject (editor only).
-     */
     public function reject(User $user, Submission $submission): bool
     {
-        return $this->sendToReview($user, $submission);
+        return $this->isEditor($user);
+    }
+
+    private function isEditor(User $user): bool
+    {
+        return DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->where('user_roles.user_id', $user->id)
+            ->whereIn('roles.slug', ['editor', 'managing_editor', 'admin'])
+            ->exists();
     }
 }

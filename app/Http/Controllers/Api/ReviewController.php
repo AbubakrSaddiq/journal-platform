@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Models\ReviewInvitation;
 use App\Services\ReviewService;
 use App\Http\Resources\ReviewResource;
+use App\Models\Submission;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Gate;
+
 
 class ReviewController extends BaseController
 {
@@ -99,5 +101,46 @@ class ReviewController extends BaseController
         return response()->json([
             'message' => 'Reviews cannot be updated after submission.'
         ], Response::HTTP_FORBIDDEN);
+    }
+
+        /**
+     * Editor invites a reviewer by email.
+     */
+    public function inviteReviewer(Submission $submission)
+    {
+        Gate::authorize('sendToReview', $submission);
+
+        $validated = request()->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        $reviewer = \App\Models\User::where('email', $validated['email'])->first();
+
+        // Check if already invited
+        $existing = \App\Models\ReviewInvitation::where('submission_id', $submission->id)
+            ->where('reviewer_id', $reviewer->id)
+            ->whereIn('status', ['pending', 'accepted'])
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'message' => 'This reviewer has already been invited.'
+            ], 422);
+        }
+
+        $invitation = $this->reviewService->inviteReviewer(
+            $submission,
+            $reviewer,
+            auth()->id()
+        );
+
+        return response()->json([
+            'message' => 'Reviewer invited successfully',
+            'invitation' => [
+                'id' => $invitation->id,
+                'reviewer' => $reviewer->name,
+                'status' => $invitation->status,
+            ]
+        ]);
     }
 }

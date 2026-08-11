@@ -109,10 +109,21 @@ class SubmissionService
     /**
      * Send to peer review.
      */
-    public function sendToReview(Submission $submission, ?int $userId = null): void
-    {
-        $this->transitionTo($submission, 'under_review', $userId, 'Assigned to reviewers');
+   public function sendToReview(Submission $submission, ?int $userId = null): void
+{
+    // If still in submitted state, move to editorial_review first
+    if ($submission->status === 'submitted') {
+        $this->transitionTo($submission, 'editorial_review', $userId, 'Passed editorial assessment');
     }
+
+    // Then move to under_review
+    $this->transitionTo($submission, 'under_review', $userId, 'Assigned to reviewers');
+
+    $submission->author->notify(new \App\Notifications\RevisionRequested(
+        $submission,
+        'under_review',
+    ));
+}
 
     /**
      * Request revision from author.
