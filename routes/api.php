@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\SubmissionController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\FileController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\NotificationController;
 
 // Health check (no rate limit)
 Route::get('/health', fn() => response()->json([
@@ -54,13 +55,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::get('versions', [FileController::class, 'versions']);
         Route::get('files/{file}/download', [FileController::class, 'download']);
         Route::post('invite-reviewer', [ReviewController::class, 'inviteReviewer'] );
+        Route::post('/upload', [FileController::class, 'uploadManuscript']);
 
     });
 
     // File uploads (with upload rate limit)
-    Route::middleware('throttle:uploads')->group(function () {
-        Route::post('/upload', [FileController::class, 'uploadManuscript']);
-    });
+    // Route::middleware('throttle:uploads')->group(function () {
+    // });
 
     // Reviews
     Route::prefix('reviews')->group(function () {
@@ -78,4 +79,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('users/{user}/roles', [AdminController::class, 'assignRole']);
         Route::delete('users/{user}/roles/{roleSlug}', [AdminController::class, 'removeRole']);
     });
+
+        // Notifications
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('notifications/{id}', [NotificationController::class, 'destroy']);
 });
