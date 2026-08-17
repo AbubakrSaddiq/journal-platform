@@ -3,12 +3,10 @@
 namespace App\Notifications;
 
 use App\Models\ReviewInvitation;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class ReviewerInvited extends Notification implements ShouldQueue
+class ReviewerInvited extends Notification 
 {
     use Queueable;
 
@@ -17,7 +15,7 @@ class ReviewerInvited extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return ['database'];
     }
 
     public function toMail(object $notifiable): MailMessage

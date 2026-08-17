@@ -3,12 +3,10 @@
 namespace App\Notifications;
 
 use App\Models\Submission;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class EditorialDecisionMade extends Notification implements ShouldQueue
+class EditorialDecisionMade extends Notification 
 {
     use Queueable;
 
@@ -19,7 +17,7 @@ class EditorialDecisionMade extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return [ 'database'];
     }
 
     public function toMail(object $notifiable): MailMessage

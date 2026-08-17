@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\FileController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\ProfileController;
+
 
 // Health check (no rate limit)
 Route::get('/health', fn() => response()->json([
@@ -56,12 +58,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::get('files/{file}/download', [FileController::class, 'download']);
         Route::post('invite-reviewer', [ReviewController::class, 'inviteReviewer'] );
         Route::post('/upload', [FileController::class, 'uploadManuscript']);
-
+        Route::get('files/{files}/download', [FileController::class, 'download']);
     });
 
-    // File uploads (with upload rate limit)
-    // Route::middleware('throttle:uploads')->group(function () {
-    // });
+  
 
     // Reviews
     Route::prefix('reviews')->group(function () {
@@ -85,4 +85,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
     Route::delete('notifications/{id}', [NotificationController::class, 'destroy']);
+
+    // Profile
+    Route::get('profile', [ProfileController::class, 'show']);
+    Route::post('profile/update', [ProfileController::class, 'update']);
+    Route::post('profile/password', [ProfileController::class, 'updatePassword']);
+
 });

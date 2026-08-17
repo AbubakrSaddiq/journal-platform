@@ -66,24 +66,30 @@ class FileController extends BaseController
     /**
      * Download a submission file.
      */
-    public function download(Submission $submission, SubmissionFile $file)
-    {
-        Gate::authorize('view', $submission);
 
-        try {
-            $filePath = $this->fileUploadService->getFileForDownload($file);
+        public function download(Submission $submission, SubmissionFile $file)
+        {
+            Gate::authorize('view', $submission);
+
+            // Verify file belongs to this submission
+            $belongsToSubmission = $submission->versions()
+                ->whereHas('files', fn($q) => $q->where('id', $file->id))
+                ->exists();
+
+            if (!$belongsToSubmission) {
+                return response()->json(['message' => 'File not found'], 404);
+            }
+
+            if (!Storage::disk('submissions')->exists($file->file_path)) {
+                return response()->json(['message' => 'File not found on disk'], 404);
+            }
 
             return Storage::disk('submissions')->download(
-                $filePath,
-                $file->original_filename
+                $file->file_path,
+                $file->original_filename,
+                ['Content-Type' => 'application/octet-stream']
             );
-
-        } catch (\RuntimeException $e) {
-            return response()->json([
-                'message' => $e->getMessage()
-            ], Response::HTTP_NOT_FOUND);
         }
-    }
 
     /**
      * List all versions for a submission.

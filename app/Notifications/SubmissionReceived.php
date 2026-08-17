@@ -3,21 +3,18 @@
 namespace App\Notifications;
 
 use App\Models\Submission;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class SubmissionReceived extends Notification implements ShouldQueue
+class SubmissionReceived extends Notification
 {
-    use Queueable;
 
     public function __construct(public Submission $submission)
     {}
 
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        return [ 'database'];
     }
 
     public function toMail(object $notifiable): MailMessage

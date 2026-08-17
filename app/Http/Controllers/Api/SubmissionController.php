@@ -75,6 +75,22 @@ class SubmissionController extends BaseController
         'submitted_at' => now(),
     ]);
 
+    // Fire notification to author
+    $submission->author->notify(
+        new \App\Notifications\SubmissionReceived(
+            $submission->load('journal')
+        )
+    );
+
+    // Log to audit trail
+    \App\Models\AuditLog::create([
+        'user_id' => auth()->id,
+        'submission_id' => $submission->id,
+        'action' => 'submission_created',
+        'changes' => ['status' => 'submitted'],
+        'timestamp' => now()
+    ]);
+
     return new SubmissionResource($submission->load(['journal', 'section', 'author']));
 }
 
