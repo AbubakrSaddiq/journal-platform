@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\FileController;
 use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\IssueController;
 
 
 // Health check (no rate limit)
@@ -91,4 +92,12 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('profile/update', [ProfileController::class, 'update']);
     Route::post('profile/password', [ProfileController::class, 'updatePassword']);
 
+    Route::prefix('journals/{journal}/issues')->group(function() {
+        Route::get('/', [IssueController::class, 'index']);
+        Route::post('/', [IssueController::class, 'store']);
+        Route::get('{issue}', [IssueController::class, 'show']);
+        Route::post('{issue}/schedule', [IssueController::class, 'scheduleSubmission']);
+        Route::delete('{issue}/submissions/{submission}', [IssueController::class, 'removeSubmission']);
+        Route::post('{issue}/publish', [IssueController::class, 'publish']);
+    });
 });
