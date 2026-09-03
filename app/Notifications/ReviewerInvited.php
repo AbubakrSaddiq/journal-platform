@@ -8,7 +8,7 @@ use Illuminate\Notifications\Notification;
 
 class ReviewerInvited extends Notification 
 {
-    use Queueable;
+
 
     public function __construct(public ReviewInvitation $invitation)
     {}

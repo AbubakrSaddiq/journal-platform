@@ -8,7 +8,7 @@ use Illuminate\Notifications\Notification;
 
 class EditorialDecisionMade extends Notification 
 {
-    use Queueable;
+
 
     public function __construct(
         public Submission $submission,

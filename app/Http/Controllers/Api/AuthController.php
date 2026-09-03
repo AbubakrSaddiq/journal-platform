@@ -28,6 +28,7 @@ class AuthController
             'affiliation' => $validated['affiliation'] ?? null,
         ]);
 
+        $user->load('roles');
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -36,6 +37,13 @@ class AuthController
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'affiliation' => $user->affiliation,
+                 'roles' => $user->roles->map(
+                    fn($r) => [
+                        'name' => $r->name,
+                        'slug' => $r->slug,
+                    ]
+                ),
             ],
             'access_token' => $token,
             'token_type' => 'Bearer',
@@ -68,6 +76,13 @@ class AuthController
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'affiliation' => $user->affiliation,
+                 'roles' => $user->roles->map(
+                    fn($r) => [
+                        'name' => $r->name,
+                        'slug' => $r->slug,
+                    ]
+                ),
             ],
             'access_token' => $token,
             'token_type' => 'Bearer',
@@ -89,7 +104,7 @@ class AuthController
      */
     public function me(Request $request)
     {
-        $user = $request->user();
+        $user = $request->user()->load('roles');
 
         return response()->json([
             'user' => [
@@ -97,6 +112,12 @@ class AuthController
                 'name' => $user->name,
                 'email' => $user->email,
                 'affiliation' => $user->affiliation,
+                'roles' => $user->roles->map(
+                    fn($r) => [
+                        'name' => $r->name,
+                        'slug' => $r->slug,
+                    ]
+                ),
             ],
         ]);
     }

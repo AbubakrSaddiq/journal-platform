@@ -8,7 +8,7 @@ use Illuminate\Notifications\Notification;
 
 class RevisionRequested extends Notification 
 {
-    use Queueable;
+
 
     public function __construct(
         public Submission $submission,
