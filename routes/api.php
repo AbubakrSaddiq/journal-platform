@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\IssueController;
+use App\Http\Controllers\Api\ArticleController;
 
 
 // Health check (no rate limit)
@@ -28,11 +29,16 @@ Route::middleware('throttle:auth')->prefix('auth')->group(function () {
 // Public journal browsing (general rate limit)
 Route::middleware('throttle:api')->group(function () {
     Route::get('journals', [JournalController::class, 'index']);
+    Route::get('journals/slug/{slug}', [JournalController::class, 'showBySlug']);
     Route::get('journals/{journal}', [JournalController::class, 'show']);
+    Route::get('articles/{submission}', [ArticleController::class, 'show']);
 });
 
 // Protected routes
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+
+// Article download
+    Route::get('articles/{submission}/download', [ArticleController::class, 'download']);
 
     // Auth management
     Route::prefix('auth')->group(function () {
