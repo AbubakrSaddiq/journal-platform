@@ -27,7 +27,7 @@ class SubmissionController extends BaseController
     public function index()
     {
         if (!auth('sanctum')->check()) {
-        return response()->json(['message' => 'Unauthenticated'], 401);
+            return response()->json(['message' => 'Unauthenticated'], 401);
         }
 
         $user = auth()->user();
@@ -60,39 +60,38 @@ class SubmissionController extends BaseController
     /**
      * Store a new submission.
      */
-   
     public function store(StoreSubmissionRequest $request)
-{
-    $submission = Submission::create([
-        'journal_id' => $request->journal_id,
-        'section_id' => $request->section_id,
-        'author_id' => auth()->id(),
-        'title' => $request->title,
-        'abstract' => $request->abstract,
-        'keywords' => $request->keywords,
-        'cover_letter' => $request->cover_letter,
-        'status' => 'submitted',
-        'submitted_at' => now(),
-    ]);
+    {
+        $submission = Submission::create([
+            'journal_id' => $request->journal_id,
+            'section_id' => $request->section_id,
+            'author_id' => auth()->id(),
+            'title' => $request->title,
+            'abstract' => $request->abstract,
+            'keywords' => $request->keywords,
+            'cover_letter' => $request->cover_letter,
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]);
 
-    // Fire notification to author
-    $submission->author->notify(
-        new \App\Notifications\SubmissionReceived(
-            $submission->load('journal')
-        )
-    );
+        // Fire notification to author
+        $submission->author->notify(
+            new \App\Notifications\SubmissionReceived(
+                $submission->load('journal')
+            )
+        );
 
-    // Log to audit trail
-    \App\Models\AuditLog::create([
-        'user_id' => auth()->id,
-        'submission_id' => $submission->id,
-        'action' => 'submission_created',
-        'changes' => ['status' => 'submitted'],
-        'timestamp' => now()
-    ]);
+        // Log to audit trail - FIXED: added parentheses to auth()->id()
+        \App\Models\AuditLog::create([
+            'user_id' => auth()->id(), // ✅ Fixed: Added parentheses
+            'submission_id' => $submission->id,
+            'action' => 'submission_created',
+            'changes' => ['status' => 'submitted'],
+            'timestamp' => now()
+        ]);
 
-    return new SubmissionResource($submission->load(['journal', 'section', 'author']));
-}
+        return new SubmissionResource($submission->load(['journal', 'section', 'author']));
+    }
 
     /**
      * Update submission metadata (only before review).

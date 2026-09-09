@@ -106,9 +106,11 @@ class ArticleController extends BaseController
      */
    public function download(Request $request, Submission $submission)
 {
-    if ($submission->status !== 'published') {
-        return response()->json(['message' => 'Article not found.'], 404);
-    }
+    if (!in_array($submission->status, ['published', 'scheduled'])) {
+    return response()->json([
+        'message' => 'Article not found or not yet published.'
+    ], 404);
+}
 
     $submission->load('currentVersion.files');
 

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\JournalController;
 use App\Http\Controllers\Api\SubmissionController;
+use App\Http\Controllers\Api\SubmissionFileController; // ✅ Add this import
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\FileController;
 use App\Http\Controllers\Api\AdminController;
@@ -37,7 +38,7 @@ Route::middleware('throttle:api')->group(function () {
 // Protected routes
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
 
-// Article download
+    // Article download
     Route::get('articles/{submission}/download', [ArticleController::class, 'download']);
 
     // Auth management
@@ -55,20 +56,20 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('submissions', [SubmissionController::class, 'store']);
     });
 
-    // Submission workflow actions
+    // ✅ FIXED: Use SubmissionFileController for file operations
     Route::prefix('submissions/{submission}')->group(function () {
         Route::post('send-to-review', [SubmissionController::class, 'sendToReview']);
         Route::post('request-revision', [SubmissionController::class, 'requestRevision']);
         Route::post('accept', [SubmissionController::class, 'accept']);
         Route::post('reject', [SubmissionController::class, 'reject']);
-        Route::get('versions', [FileController::class, 'versions']);
-        Route::get('files/{file}/download', [FileController::class, 'download']);
-        Route::post('invite-reviewer', [ReviewController::class, 'inviteReviewer'] );
-        Route::post('/upload', [FileController::class, 'uploadManuscript']);
-        Route::get('files/{files}/download', [FileController::class, 'download']);
+        
+        // ✅ Fixed file upload routes - using SubmissionFileController
+        Route::post('upload', [SubmissionFileController::class, 'upload']);
+        Route::get('versions', [SubmissionFileController::class, 'index']);
+        Route::get('files/{file}/download', [SubmissionFileController::class, 'download']);
+        
+        Route::post('invite-reviewer', [ReviewController::class, 'inviteReviewer']);
     });
-
-  
 
     // Reviews
     Route::prefix('reviews')->group(function () {
@@ -77,7 +78,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('{reviewInvitation}/accept', [ReviewController::class, 'acceptInvitation']);
         Route::post('{reviewInvitation}/decline', [ReviewController::class, 'declineInvitation']);
         Route::post('{reviewInvitation}/submit', [ReviewController::class, 'submitReview']);
-
     });
 
     // Admin routes
@@ -87,7 +87,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::delete('users/{user}/roles/{roleSlug}', [AdminController::class, 'removeRole']);
     });
 
-        // Notifications
+    // Notifications
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
@@ -98,6 +98,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     Route::post('profile/update', [ProfileController::class, 'update']);
     Route::post('profile/password', [ProfileController::class, 'updatePassword']);
 
+    // Issues
     Route::prefix('journals/{journal}/issues')->group(function() {
         Route::get('/', [IssueController::class, 'index']);
         Route::post('/', [IssueController::class, 'store']);
