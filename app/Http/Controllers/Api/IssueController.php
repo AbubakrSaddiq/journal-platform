@@ -164,26 +164,30 @@ class IssueController extends BaseController
      * Publish an issue.
      */
    public function publish(Journal $journal, Issue $issue)
-    {
-        if ($issue->published_at) {
-            return response()->json([
-                'message' => 'Issue is already published.'
-            ], 422);
-        }
+        {
+    if ($issue->published_at) {
+        return response()->json([
+            'message' => 'Issue is already published.'
+        ], 422);
+    }
 
-        if ($issue->submissions()->count() === 0) {
-            return response()->json([
-                'message' => 'Cannot publish an empty issue.'
-            ], 422);
-        }
+    if ($issue->submissions()->count() === 0) {
+        return response()->json([
+            'message' => 'Cannot publish an empty issue.'
+        ], 422);
+    }
 
-        $userId = auth()->id();
-        $submissionService = app(\App\Services\SubmissionService::class);
+    $userId = auth()->id();
+    $submissionService = app(\App\Services\SubmissionService::class);
 
-        DB::transaction(function () use ($issue, $userId, $submissionService) {
-            $issue->update(['published_at' => now()]);
+    DB::transaction(function () use ($issue, $userId, $submissionService) {
+        // Publish the issue
+        $issue->update(['published_at' => now()]);
 
-            $issue->submissions()->each(function ($submission) use ($userId, $submissionService) {
+        // Cascade each submission individually so audit + notifications fire
+        $issue->submissions()->each(
+            // ✅ $issue added to inner closure use list
+            function ($submission) use ($issue, $userId, $submissionService) {
                 if ($submission->status !== 'scheduled') {
                     return;
                 }
@@ -196,13 +200,17 @@ class IssueController extends BaseController
                 );
 
                 $submission->author->notify(
-                    new \App\Notifications\SubmissionStatusChanged($submission, 'published')
+                    new \App\Notifications\SubmissionStatusChanged(
+                        $submission,
+                        'published'
+                    )
                 );
-            });
-        });
+            }
+        );
+    });
 
-        return response()->json([
-            'message' => "Vol. {$issue->volume}, No. {$issue->issue_number} published successfully",
-        ]);
+    return response()->json([
+        'message' => "Vol. {$issue->volume}, No. {$issue->issue_number} published successfully",
+    ]);
     }
 }
