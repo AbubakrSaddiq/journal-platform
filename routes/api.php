@@ -56,19 +56,20 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('submissions', [SubmissionController::class, 'store']);
     });
 
-    // ✅ FIXED: Use SubmissionFileController for file operations
+    //  Use SubmissionFileController for file operations
     Route::prefix('submissions/{submission}')->group(function () {
         Route::post('send-to-review', [SubmissionController::class, 'sendToReview']);
         Route::post('request-revision', [SubmissionController::class, 'requestRevision']);
         Route::post('accept', [SubmissionController::class, 'accept']);
         Route::post('reject', [SubmissionController::class, 'reject']);
-        
-        // ✅ Fixed file upload routes - using SubmissionFileController
         Route::post('upload', [SubmissionFileController::class, 'upload']);
         Route::get('versions', [SubmissionFileController::class, 'index']);
         Route::get('files/{file}/download', [SubmissionFileController::class, 'download']);
-        
         Route::post('invite-reviewer', [ReviewController::class, 'inviteReviewer']);
+        Route::post('send-to-editing', [SubmissionController::class, 'sendToEditing']);
+          Route::post('send-to-production', [SubmissionController::class, 'sendToProduction']);
+    Route::post('schedule', [SubmissionController::class, 'schedule']);
+    Route::post('publish', [SubmissionController::class, 'publish']);
     });
 
     // Reviews
@@ -106,5 +107,18 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
         Route::post('{issue}/schedule', [IssueController::class, 'scheduleSubmission']);
         Route::delete('{issue}/submissions/{submission}', [IssueController::class, 'removeSubmission']);
         Route::post('{issue}/publish', [IssueController::class, 'publish']);
+    });
+
+    // Journal Management (editor/admin)
+    Route::prefix('manage/journals')->group(function () {
+        Route::get('/', [JournalController::class, 'adminIndex']);
+        Route::post('/', [JournalController::class, 'store']);
+        Route::put('{journal}', [JournalController::class, 'update']);
+        Route::delete('{journal}', [JournalController::class, 'destroy']);
+        Route::post('{journal}/publish', [JournalController::class, 'publish']);
+        Route::post('{journal}/unpublish', [JournalController::class, 'unpublish']);
+        Route::post('{journal}/sections', [JournalController::class, 'addSection']);
+        Route::put('{journal}/sections/{section}', [JournalController::class, 'updateSection']);
+        Route::delete('{journal}/sections/{section}', [JournalController::class, 'deleteSection']);
     });
 });

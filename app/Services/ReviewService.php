@@ -8,6 +8,9 @@ use App\Models\Review;
 use App\Models\User;
 use App\Models\AuditLog;
 use App\Notifications\ReviewerInvited;
+use App\Notifications\ReviewSubmitted;
+use App\Notifications\ReviewInvitationResponded;
+use Illuminate\Support\Facades\DB;
 
 class ReviewService
 {
@@ -31,10 +34,10 @@ class ReviewService
             'reviewer_name' => $reviewer->name,
         ]);
 
-        // Send email notification to reviewer
-        // Notify reviewer
-        $reviewer->notify(new ReviewerInvited($invitation->load('submission.journal')));
-        
+        $reviewer->notify(
+            new ReviewerInvited($invitation->load('submission.journal'))
+        );
+
         return $invitation;
     }
 
@@ -51,6 +54,12 @@ class ReviewService
         $this->auditLog($invitation->submission, $userId, 'reviewer_accepted', [
             'reviewer_id' => $invitation->reviewer_id,
         ]);
+
+        // ✅ Notify the editor who invited the reviewer
+        $this->notifyEditors(
+            $invitation,
+            'accepted'
+        );
     }
 
     /**
@@ -67,7 +76,11 @@ class ReviewService
             'reviewer_id' => $invitation->reviewer_id,
         ]);
 
-        // TODO: Notify editor that reviewer declined
+        // ✅ Notify the editor who invited the reviewer
+        $this->notifyEditors(
+            $invitation,
+            'declined'
+        );
     }
 
     /**
@@ -80,31 +93,95 @@ class ReviewService
         string $recommendation,
         ?int $userId = null
     ): Review {
-        // Validate recommendation
         $validRecommendations = ['accept', 'minor_revision', 'major_revision', 'reject', 'resubmit'];
         if (!in_array($recommendation, $validRecommendations)) {
             throw new \InvalidArgumentException("Invalid recommendation: {$recommendation}");
         }
 
-        $review = Review::create([
-            'submission_id' => $invitation->submission_id,
-            'review_invitation_id' => $invitation->id,
-            'comments_for_editor' => $commentsForEditor,
-            'comments_for_author' => $commentsForAuthor,
-            'recommendation' => $recommendation,
-            'submitted_at' => now(),
-        ]);
+        return DB::transaction(function () use (
+            $invitation,
+            $commentsForEditor,
+            $commentsForAuthor,
+            $recommendation,
+            $userId
+        ) {
+            $review = Review::create([
+                'submission_id' => $invitation->submission_id,
+                'review_invitation_id' => $invitation->id,
+                'comments_for_editor' => $commentsForEditor,
+                'comments_for_author' => $commentsForAuthor,
+                'recommendation' => $recommendation,
+                'submitted_at' => now(),
+            ]);
 
-        $invitation->update(['status' => 'completed']);
+            $invitation->update(['status' => 'completed']);
 
-        $this->auditLog($invitation->submission, $userId, 'review_submitted', [
-            'reviewer_id' => $invitation->reviewer_id,
-            'recommendation' => $recommendation,
-        ]);
+            $this->auditLog($invitation->submission, $userId, 'review_submitted', [
+                'reviewer_id' => $invitation->reviewer_id,
+                'recommendation' => $recommendation,
+            ]);
 
-        // TODO: Notify editor that review is submitted
+            // ✅ Notify the editor(s)
+            $this->notifyEditorsOfReview($invitation, $review);
 
-        return $review;
+            // ✅ Notify the author that a review is complete (no confidential details)
+            $invitation->submission->author->notify(
+                new \App\Notifications\RevisionRequested(
+                    $invitation->submission,
+                    'peer_review_completed',
+                    'A reviewer has completed their assessment.'
+                )
+            );
+
+            return $review;
+        });
+    }
+
+    /**
+     * Notify editors that a reviewer responded to an invitation.
+     */
+    protected function notifyEditors(ReviewInvitation $invitation, string $response): void
+    {
+        $submission = $invitation->submission()->with('journal')->first();
+        if (!$submission) {
+            return;
+        }
+
+        $editorIds = DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->whereIn('roles.slug', ['editor', 'managing_editor', 'admin'])
+            ->pluck('user_roles.user_id')
+            ->unique();
+
+        if ($editorIds->isEmpty()) {
+            return;
+        }
+
+        User::whereIn('id', $editorIds)->each(
+            fn (User $editor) => $editor->notify(
+                new ReviewInvitationResponded($invitation, $response)
+            )
+        );
+    }
+
+    /**
+     * Notify editors that a review has been submitted.
+     */
+    protected function notifyEditorsOfReview(ReviewInvitation $invitation, Review $review): void
+    {
+        $editorIds = DB::table('user_roles')
+            ->join('roles', 'roles.id', '=', 'user_roles.role_id')
+            ->whereIn('roles.slug', ['editor', 'managing_editor', 'admin'])
+            ->pluck('user_roles.user_id')
+            ->unique();
+
+        if ($editorIds->isEmpty()) {
+            return;
+        }
+
+        User::whereIn('id', $editorIds)->each(
+            fn (User $editor) => $editor->notify(new ReviewSubmitted($review))
+        );
     }
 
     /**

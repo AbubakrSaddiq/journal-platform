@@ -3,11 +3,14 @@
 namespace App\Services;
 
 use App\Models\Submission;
+use App\Models\Issue;
+use App\Models\IssueSubmission;
 use App\Models\AuditLog;
 use Illuminate\Database\Eloquent\Model;
 use App\Notifications\SubmissionReceived;
 use App\Notifications\RevisionRequested;
 use App\Notifications\EditorialDecisionMade;
+use App\Notifications\SubmissionStatusChanged;
 
 class SubmissionService
 {
@@ -39,6 +42,7 @@ class SubmissionService
      * @param ?string $reason Optional reason for transition
      * @return bool Success
      */
+
     public function transitionTo(
         Submission $submission,
         string $newStatus,
@@ -156,7 +160,7 @@ class SubmissionService
     public function reject(Submission $submission, ?int $userId = null, ?string $reason = null): void
     {
         $this->transitionTo($submission, 'rejected', $userId, $reason ?? 'Submission rejected');
-        
+
         // Notify author
         $submission->author->notify(new EditorialDecisionMade($submission, 'rejected'));
     }
@@ -167,6 +171,10 @@ class SubmissionService
     public function sendToEditing(Submission $submission, ?int $userId = null): void
     {
         $this->transitionTo($submission, 'editing', $userId, 'Sent for editing');
+
+        // Notify author
+        $submission->author->notify( new SubmissionStatusChanged($submission, 'editing'));
+
     }
 
     /**
@@ -175,14 +183,67 @@ class SubmissionService
     public function sendToProduction(Submission $submission, ?int $userId = null): void
     {
         $this->transitionTo($submission, 'production', $userId, 'Sent to production');
-    }
+
+        // Notify author
+        $submission->author->notify( new SubmissionStatusChanged($submission, 'production'));
+        }
 
     /**
-     * Schedule for publication.
+     * Schedule a submission into an issue for publication.
+     * Creates the issue_submissions pivot row and transitions status.
      */
-    public function schedule(Submission $submission, ?int $userId = null): void
-    {
-        $this->transitionTo($submission, 'scheduled', $userId, 'Scheduled for publication');
+    public function schedule(
+        Submission $submission,
+        int $issueId,
+        ?int $userId = null
+    ): void {
+    $issue = Issue::findOrFail($issueId);
+
+    if ($issue->journal_id !== $submission->journal_id) {
+        throw new \InvalidArgumentException(
+            'The selected issue belongs to a different journal.'
+        );
+    }
+
+    if ($issue->published_at) {
+        throw new \InvalidArgumentException(
+            'Cannot schedule into a published issue.'
+        );
+    }
+
+    // Enforce one-issue-per-submission
+    $alreadyElsewhere = IssueSubmission::where('submission_id', $submission->id)
+        ->where('issue_id', '!=', $issue->id)
+        ->exists();
+
+    if ($alreadyElsewhere) {
+        throw new \InvalidArgumentException(
+            'Submission is already scheduled in another issue.'
+        );
+    }
+
+    // Idempotent — safe if re-run on the same issue
+    IssueSubmission::firstOrCreate(
+        [
+            'issue_id' => $issue->id,
+            'submission_id' => $submission->id,
+        ],
+        ['page_number' => null]
+    );
+
+    // Only transition if not already scheduled (e.g. re-adding to same issue)
+    if ($submission->status !== 'scheduled') {
+        $this->transitionTo(
+            $submission,
+            'scheduled',
+            $userId,
+            "Scheduled in Vol. {$issue->volume}, No. {$issue->issue_number}"
+        );
+
+        $submission->author->notify(
+            new SubmissionStatusChanged($submission, 'scheduled')
+        );
+    }
     }
 
     /**
@@ -191,6 +252,9 @@ class SubmissionService
     public function publish(Submission $submission, ?int $userId = null): void
     {
         $this->transitionTo($submission, 'published', $userId, 'Published');
+        // Notify author
+        $submission->author->notify( new SubmissionStatusChanged($submission, 'published'));
+
     }
 
     /**

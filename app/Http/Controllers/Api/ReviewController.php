@@ -26,7 +26,16 @@ class ReviewController extends BaseController
     public function index()
     {
         $invitations = ReviewInvitation::where('reviewer_id', auth()->id())
-            ->with(['submission', 'submission.journal', 'submission.section'])
+            ->with([
+                'submission',
+                'submission.journal',
+                'submission.section',
+                'submission.author',
+                // ✅ Eager-load current version + its files
+                'submission.currentVersion',
+                'submission.currentVersion.files',
+                'reviews',
+            ])
             ->latest()
             ->paginate(15);
 
@@ -41,7 +50,16 @@ class ReviewController extends BaseController
         Gate::authorize('view', $reviewInvitation);
 
         return new ReviewResource(
-            $reviewInvitation->load(['submission', 'submission.journal'])
+            $reviewInvitation->load([
+                'submission',
+                'submission.journal',
+                'submission.section',
+                'submission.author',
+                // ✅ Eager-load current version + its files
+                'submission.currentVersion',
+                'submission.currentVersion.files',
+                'reviews',
+            ])
         );
     }
 
@@ -103,7 +121,7 @@ class ReviewController extends BaseController
         ], Response::HTTP_FORBIDDEN);
     }
 
-        /**
+    /**
      * Editor invites a reviewer by email.
      */
     public function inviteReviewer(Submission $submission)

@@ -103,41 +103,48 @@ class IssueController extends BaseController
     /**
      * Schedule a submission to an issue.
      */
-    public function scheduleSubmission(Request $request, Journal $journal, Issue $issue)
+   public function scheduleSubmission(Request $request, Journal $journal, Issue $issue)
     {
-        $validated = $request->validate([
-            'submission_id' => 'required|exists:submissions,id',
-            'page_number' => 'nullable|string|max:20',
-        ]);
+    $validated = $request->validate([
+        'submission_id' => 'required|exists:submissions,id',
+        'page_number' => 'nullable|string|max:20',
+    ]);
 
-        $submission = Submission::findOrFail($validated['submission_id']);
+    $submission = Submission::findOrFail($validated['submission_id']);
 
-        // Only accepted submissions can be scheduled
-        if ($submission->status !== 'accepted') {
-            return response()->json([
-                'message' => 'Only accepted submissions can be scheduled for publication.'
-            ], 422);
-        }
-
-        // Check not already in this issue
-        $exists = $issue->submissions()->where('submission_id', $submission->id)->exists();
-        if ($exists) {
-            return response()->json([
-                'message' => 'Submission is already scheduled in this issue.'
-            ], 422);
-        }
-
-        // Add to issue
-        $issue->submissions()->attach($submission->id, [
-            'page_number' => $validated['page_number'] ?? null,
-        ]);
-
-        // Update submission status to scheduled
-        $submission->update(['status' => 'scheduled']);
-
+    if ($submission->journal_id !== $journal->id) {
         return response()->json([
-            'message' => 'Submission scheduled successfully',
-        ]);
+            'message' => 'Submission does not belong to this journal.'
+        ], 422);
+    }
+
+    //  Accept production (the actual pre-scheduling status)
+    if (!in_array($submission->status, ['production', 'accepted'], true)) {
+        return response()->json([
+            'message' => 'Only submissions in production can be scheduled.'
+        ], 422);
+    }
+
+    try {
+        app(\App\Services\SubmissionService::class)->schedule(
+            $submission,
+            $issue->id,
+            auth()->id()
+        );
+    } catch (\InvalidArgumentException $e) {
+        return response()->json(['message' => $e->getMessage()], 422);
+    }
+
+    // Optional page number, set after the pivot row exists
+    if (!empty($validated['page_number'])) {
+        \App\Models\IssueSubmission::where('issue_id', $issue->id)
+            ->where('submission_id', $submission->id)
+            ->update(['page_number' => $validated['page_number']]);
+    }
+
+    return response()->json([
+        'message' => 'Submission scheduled successfully',
+    ]);
     }
 
     /**
@@ -156,7 +163,7 @@ class IssueController extends BaseController
     /**
      * Publish an issue.
      */
-    public function publish(Journal $journal, Issue $issue)
+   public function publish(Journal $journal, Issue $issue)
     {
         if ($issue->published_at) {
             return response()->json([
@@ -170,12 +177,28 @@ class IssueController extends BaseController
             ], 422);
         }
 
-        DB::transaction(function () use ($issue) {
-            // Publish the issue
+        $userId = auth()->id();
+        $submissionService = app(\App\Services\SubmissionService::class);
+
+        DB::transaction(function () use ($issue, $userId, $submissionService) {
             $issue->update(['published_at' => now()]);
 
-            // Mark all scheduled submissions as published
-            $issue->submissions()->update(['status' => 'published']);
+            $issue->submissions()->each(function ($submission) use ($userId, $submissionService) {
+                if ($submission->status !== 'scheduled') {
+                    return;
+                }
+
+                $submissionService->transitionTo(
+                    $submission,
+                    'published',
+                    $userId,
+                    "Published in Vol. {$issue->volume}, No. {$issue->issue_number}"
+                );
+
+                $submission->author->notify(
+                    new \App\Notifications\SubmissionStatusChanged($submission, 'published')
+                );
+            });
         });
 
         return response()->json([

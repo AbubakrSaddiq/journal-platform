@@ -24,25 +24,29 @@ class SubmissionController extends BaseController
      * Get all submissions for authenticated user.
      * Authors see their own, editors see journal's, admins see all.
      */
-    public function index()
+   public function index()
     {
-        if (!auth('sanctum')->check()) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
+    if (!auth('sanctum')->check()) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
+    }
 
-        $user = auth()->user();
+    $user = auth()->user();
 
-        $query = Submission::with(['author', 'journal', 'section', 'currentVersion'])
-            ->latest();
+    $query = Submission::with(['author', 'journal', 'section', 'currentVersion', 'issues'])
+        ->latest();
 
-        // Filter by user role (simplified—real implementation would use policies)
-        if ($user->roles()->where('slug', 'author')->exists()) {
-            $query->where('author_id', $user->id);
-        }
+    $isEditor = $user->roles()
+        ->whereIn('slug', ['editor', 'managing_editor', 'admin'])
+        ->exists();
 
-        $submissions = $query->paginate(15);
+    // Editors/admins see everything; authors see only their own
+    if (!$isEditor) {
+        $query->where('author_id', $user->id);
+    }
 
-        return SubmissionResource::collection($submissions);
+    $submissions = $query->paginate(15);
+
+    return SubmissionResource::collection($submissions);
     }
 
     /**
@@ -149,6 +153,68 @@ class SubmissionController extends BaseController
 
         return new SubmissionResource($submission->refresh());
     }
+
+    /**
+     * Send accepted submission to editing (editor action).
+     */
+    public function sendToEditing(Submission $submission)
+    {
+        Gate::authorize('sendToEditing', $submission);
+
+        $this->submissionService->sendToEditing($submission, auth()->id());
+
+        return new SubmissionResource($submission->refresh());
+    }
+
+    /**
+ * Send edited submission to production (editor action).
+ */
+public function sendToProduction(Submission $submission)
+{
+    Gate::authorize('sendToProduction', $submission);
+
+    $this->submissionService->sendToProduction($submission, auth()->id());
+
+    return new SubmissionResource($submission->refresh());
+}
+
+    /**
+     * Schedule submission into an issue for publication (managing editor action).
+     */
+    public function schedule(Submission $submission)
+    {
+    Gate::authorize('schedule', $submission);
+
+    $validated = request()->validate([
+        'issue_id' => 'required|exists:issues,id',
+    ]);
+
+    try {
+        $this->submissionService->schedule(
+            $submission,
+            (int) $validated['issue_id'],
+            auth()->id()
+        );
+    } catch (\InvalidArgumentException $e) {
+        return response()->json(['message' => $e->getMessage()], 422);
+    }
+
+    return new SubmissionResource(
+        $submission->refresh()->load(['journal', 'section', 'author', 'issues'])
+    );
+    }
+
+/**
+ * Publish submission (managing editor action).
+ */
+public function publish(Submission $submission)
+{
+    Gate::authorize('publish', $submission);
+
+    $this->submissionService->publish($submission, auth()->id());
+
+    return new SubmissionResource($submission->refresh());
+}
 
     /**
      * Reject submission (editor action).
